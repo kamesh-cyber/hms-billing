@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  billing_database:
+    image: mysql:8.0
+    container_name: billing_database
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: billing_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - billing_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - billing_network
+
+  billing_service:
+    build: .
+    container_name: billing_service
+    ports:
+      - "3002:3002"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:rootpassword@billing_database:3306/billing_db
+      - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    depends_on:
+      billing_database:
+        condition: service_healthy
+    networks:
+      - billing_network
+
+volumes:
+  billing_db_data:
+
+networks:
+  billing_network:
+    driver: bridge
+
