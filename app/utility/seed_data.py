@@ -41,7 +41,7 @@ def seed_bills_from_csv(db: Session):
         # Get the path to the CSV file
         csv_path = os.path.join(
             os.path.dirname(__file__),
-            "seed_data",
+            "resources",
             "hms_bills.csv"
         )
 
