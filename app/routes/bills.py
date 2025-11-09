@@ -87,7 +87,7 @@ async def list_bills(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     patient_id: Optional[int] = Query(None, description="Filter by patient ID"),
-    appointment_id: Optional[int] = Query(None, description="Filter by appointment ID"),
+    appointment_id: Optional[str] = Query(None, description="Filter by appointment ID"),
     status: Optional[BillStatus] = Query(None, description="Filter by bill status"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -187,8 +187,97 @@ async def get_bill(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve bill"
         )
-# Routes module
-from app.routes import bills
 
-__all__ = ["bills"]
 
+@router.get("/bill", response_model=BillResponse)
+async def get_bill_by_appointment(
+    appointment_id: str = Query(..., description="Appointment ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a bill by appointment ID using query parameter"""
+    start_time = time.time()
+    logger.info(f"Retrieving bill for appointment_id={appointment_id}")
+
+    try:
+        bill = db.query(Bill).filter(Bill.appointment_id == appointment_id).first()
+
+        if not bill:
+            logger.warning(f"Bill not found for appointment_id={appointment_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Bill not found for appointment {appointment_id}"
+            )
+
+        elapsed_time = time.time() - start_time
+        logger.info(
+            f"Bill retrieved successfully: bill_id={bill.bill_id}, "
+            f"appointment_id={appointment_id}, time_taken={elapsed_time:.4f}s"
+        )
+
+        return bill
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving bill: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve bill"
+        )
+
+
+
+
+@router.patch("/appointment/{appointment_id}/cancel", response_model=BillResponse)
+async def cancel_bill_by_appointment(
+    appointment_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel a bill by marking it as CANCELLED (VOID) for the given appointment ID.
+
+    This endpoint is used when an appointment is cancelled to void the associated bill.
+    """
+    start_time = time.time()
+    logger.info(f"Cancelling bill for appointment_id={appointment_id}")
+
+    try:
+        # Find the bill for this appointment
+        bill = db.query(Bill).filter(Bill.appointment_id == appointment_id).first()
+
+        if not bill:
+            logger.warning(f"Bill not found for appointment_id={appointment_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Bill not found for appointment {appointment_id}"
+            )
+
+        # Check if bill is already cancelled
+        if bill.status == BillStatus.CANCELLED:
+            logger.info(f"Bill already cancelled for appointment_id={appointment_id}")
+            return bill
+
+        # Update bill status to CANCELLED (VOID)
+        bill.status = BillStatus.CANCELLED
+        db.commit()
+        db.refresh(bill)
+
+        elapsed_time = time.time() - start_time
+        logger.info(
+            f"Bill cancelled successfully: bill_id={bill.bill_id}, "
+            f"appointment_id={appointment_id}, time_taken={elapsed_time:.4f}s"
+        )
+
+        return bill
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error cancelling bill: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel bill"
+        )

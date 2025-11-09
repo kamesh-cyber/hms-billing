@@ -6,6 +6,8 @@ metadata:
     app: billing-service
 spec:
   replicas: 2
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: billing-ms
@@ -18,19 +20,19 @@ spec:
         - name: billing-ms
           image: kams97/billing_service:latest
           ports:
-            - containerPort: 3001
+            - containerPort: 3002
           livenessProbe:
             httpGet:
-              path: /health
-              port: 3001
+              path: /health/live
+              port: 3002
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
-              port: 3001
+              path: /health/ready
+              port: 3002
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 2

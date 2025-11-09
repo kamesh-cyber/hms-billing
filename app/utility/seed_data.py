@@ -70,7 +70,7 @@ def seed_bills_from_csv(db: Session):
                 bill = Bill(
                     bill_id=int(row['bill_id']),
                     patient_id=int(row['patient_id']),
-                    appointment_id=int(row['appointment_id']),
+                    appointment_id=row['appointment_id'],
                     amount=float(row['amount']),
                     status=bill_status,
                     created_at=created_at
